@@ -5,17 +5,34 @@ var globalDispatch = d3.dispatch('timerange:update');
 /*Example 1: Basic brush usage
 */
 var m = {t:20,r:20,b:20,l:20},
-	w = d3.select('#plot1').node().clientWidth - m.l - m.r,
-	h = d3.select('#plot1').node().clientHeight - m.t - m.b;
+		w = d3.select('#plot1').node().clientWidth - m.l - m.r,
+		h = d3.select('#plot1').node().clientHeight - m.t - m.b;
+
 var plot1 = d3.select('#plot1').append('svg')
-	.attr('width',w + m.l + m.r)
-	.attr('height',h+ m.t + m.b)
-	.append('g')
-	.attr('transform','translate('+m.l+','+m.t+')');
+		.attr('width',w + m.l + m.r)
+		.attr('height',h+ m.t + m.b)
+		.append('g')
+		.attr('transform','translate('+m.l+','+m.t+')');
 
 //Step 1: set up a brush function
+var brush = d3.brush()
+		.extent([[0,0],[w,h]])
+		.on('start',function(){
+			console.log('Brush start');
+		})
+		.on('brush',function(){
+			d3.select(this).select('.selection').style('fill','red');
+		})
+		.on('end',function(){
+			d3.select(this).select('.selection').style('fill','black');
+			console.log(d3.event);
+			console.log(this);
+		})
 
 //Step 2: call brush function on a selection of <g> element
+//brush(plot1.append('g').attr('class','brush')); //-- this is option A
+plot1.append('g').attr('class','brush')
+		 .call(brush);
 
 //Step 3: define callback for "start", "brush", and "end" events
 
@@ -26,18 +43,37 @@ d3.queue()
 	.await(dataLoaded);
 
 function dataLoaded(err,trips,stations){
-	
+
 	//Data model
 	var cf = crossfilter(trips);
 	var tripsByStartTime = cf.dimension(function(d){return d.startTime}),
 		tripsByStartStation = cf.dimension(function(d){return d.startStn}),
 		tripsByEndStation = cf.dimension(function(d){return d.endStn});
 
-/*	Part 2: context + focus
+/*	Part 2: context + focus */
+var timeseriesContext = Timeseries()
+		.on('timerange:update', function(range){
+			console.log('app:timerange:update');
+			console.log(range);
+			globalDispatch.call('timerange:update',this,range);
+		});
+var timeseriesFocus = Timeseries().brushable(false);
 
-/*	Part 3: set brush extent programmatically
-*/
+d3.select('#plot2').datum(tripsByStartTime.top(Infinity)).call(timeseriesFocus);
+d3.select('#plot3').datum(tripsByStartTime.top(Infinity)).call(timeseriesContext);
 
+/*	Part 3: set brush extent programmatically */
+var timeseriesContext2 = Timeseries()
+	.on('timerange:update',function(range){
+		globalDispatch.call('timerange:update',this,range);
+	});
+
+	d3.select('#plot4').datum(tripsByStartTime.top(Infinity)).call(timeseriesContext2);
+
+globalDispatch.on('timerange:update',function(range){
+	timeseriesFocus.domain(range);
+	d3.select('#plot2').call(timeseriesFocus);
+});
 
 }
 
